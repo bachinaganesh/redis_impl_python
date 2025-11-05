@@ -1,28 +1,69 @@
 from redis import Redis
 import json
-from concurrent.futures import ThreadPoolExecutor
+from multiprocessing import Pool
 import time
+import logging
+import sys
 
-r = Redis(decode_responses=True)
-pool = ThreadPoolExecutor(max_workers=5)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+# Add handler to output logs to the console
+handler = logging.StreamHandler(sys.stdout)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+
+
+r = Redis(host="localhost", port=6379, decode_responses=True)
 
 def worker(task_json: str):
     task = json.loads(task_json)
     task_id = task["id"]
     payload = task["payload"]
-    r.hset(f"task:{task_id}", mapping={"status": "processing"})
-    process_task(task_id, payload)
+    try:
+        process_task(task_id, payload)
+    except Exception as e:
+        r.hset(f"{task:{task_id}}", mapping={"status": "failed", "progress": "100"})
 
 
 def process_task(task_id, payload):
     print(f"Payload start for task : {task_id}")
-    time.sleep(50)
+
+    # Task1: fetching lookuptask is processing
+    logger.info(f"Fetching lookup data and task id: {task_id}")
+    time.sleep(5)
+    # when task1 is completed here update the prgress to 15 percentage
+    r.hset(f"task:{task_id}", mapping={"status": "processing", "progress": "15"})
+
+    # Task2: Processing strategy 
+    logger.info(f"Processing strategy resuly and task id: {task_id}")
+    time.sleep(10)
+    # when task2 is completed here update the progress to 50 percentage
+    r.hset(f"task:{task_id}", mapping={"status": "processing", "progress": "50"})
+
+    # Task3: Store the data to database
+    logger.info(f"Store the data into database and task id: {task_id}")
+    time.sleep(5)
+    # when task3 is completed update the staus and progress is 100 
+    r.hset(f"task:{task_id}", mapping={"status": "completed", "progress": "100"})
+    # send the json response 
+
+
     print(f"Payload completed for task : {task_id}")
 
 def start_engine():
-    while True:
-        _, task_josn = r.brpop("task_queue")
-        pool.submit(worker, task_josn)
+    pool = Pool(processes=5)
+    try:
+        while True:
+            _, task_josn = r.brpop("task_queue")
+            if not task_josn:
+                continue
+            pool.apply_async(worker, args=(task_josn, ))
+    finally:
+        pool.close()
+        pool.join()
+
 
 
 if __name__ == "__main__":
