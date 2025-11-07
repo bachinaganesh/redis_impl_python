@@ -19,7 +19,7 @@ async def enqueue_task(payload: dict):
     await redis_async.hset(f"task:{task_id}", mapping={"status": "queued", "progress": "0"})
     return task_id
 
-@app.post("/submit-task")
+@app.post("/manager/receive-legs")
 async def submit_task(request: Request):
     payload = await request.json()
     task_id = await enqueue_task(payload)

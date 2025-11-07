@@ -24,7 +24,7 @@ def worker(task_json: str):
     try:
         process_task(task_id, payload)
     except Exception as e:
-        r.hset(f"{task:{task_id}}", mapping={"status": "failed", "progress": "100"})
+        r.hset(f"task:{task_id}", mapping={"status": "failed", "progress": "100"})
 
 
 def process_task(task_id, payload):
